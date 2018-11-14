@@ -27,16 +27,17 @@ sheet5 = book.add_sheet("ODE")
 
 low_I0=0
 up_I0=.01
-low_M=0
+low_M=1
 up_M=2000000
 
 T=120
 global dt
 dt=1
 S_I0=np.linspace(low_I0, up_I0, 51)
-S_M0=np.linspace(low_M, up_M, 51)
+#S_M0=np.linspace(low_M, up_M, 51)
+S_M0=np.logspace(-1, 5.301029995664,num=400, base=10.0)
 states=list(itertools.product(S_I0,S_M0))
-moves=np.linspace(10,10000,51)
+moves=np.linspace(200,3000,101)
 #CA=np.logspace(3.301029995, 3.579783596,num=100, base=10.0)
 #CA=np.logspace(3.30102999,3.5797358, num=101, base=10.0)
 
@@ -161,6 +162,10 @@ def get_state(state, action_a, time, Io):
     All = temp2[-1]
     Mw_avg_new=MWm*(All[5]+All[8])/(All[4]+All[7])
     reward=(Mw_avg_new-Mw_avg_old)*1000000000000
+    if reward<0:
+        reward=-5000000
+    else:
+        reward=np.inf
 
     return All, reward
 
@@ -288,7 +293,7 @@ Q=np.zeros([len(states), len(moves)])
 #        Q[i][j]=reward    
 #%%
     
-def q_mat(N_episodes, gamma=0.99, alpha=0.45):
+def q_mat(N_episodes, gamma=0.99, alpha=0.25):
     init_val=[I0, M0, 0.01, 0.01, 0, 0, 0, 0, 0, M0, M0, V, 0, (kt_0)*exp(A11*(50)+A12), (Kpo_0)*exp(B11*(50)+B12), (kt_0)*exp(A11*(50)+A12)]
     Io=init_val
     epsilon=0.1
@@ -298,8 +303,12 @@ def q_mat(N_episodes, gamma=0.99, alpha=0.45):
     Rlm_ep=np.zeros([N_episodes, int(T/dt)+1])
     rew_ep=np.zeros([N_episodes, int(T/dt)+1])
     ind_ep=np.zeros([N_episodes, int(T/dt)+1])
+    M0_app_ep=np.zeros([N_episodes, int(T/dt)+1])
+    I0_app_ep=np.zeros([N_episodes, int(T/dt)+1])
+    next_state_ep=np.zeros([N_episodes, int(T/dt)+1])
+    ode_M0_app_ep=np.zeros([N_episodes, int(T/dt)+1])
 #    Num_ep=np.asarray([1, 10, 30, 50, 100, 200, 400, 700, 900, 1000, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000])
-    Num_ep=np.linspace(1,150,150)
+    Num_ep=np.linspace(1,N_episodes, N_episodes)
     Num_ep=[int(x) for x in Num_ep]
     for n in range(N_episodes):
         temp_lst=list()
@@ -332,32 +341,19 @@ def q_mat(N_episodes, gamma=0.99, alpha=0.45):
             new_M0=All[1]
 
             rew_ep[n][j]=reward
-                
+            ode_M0_app_ep[n][j]=new_M0    
             new_I0=find_nearest(S_I0, new_I0)
             new_M0=find_nearest(S_M0, new_M0)
-            
+            M0_app_ep[n][j]=new_M0
+            I0_app_ep[n][j]=new_I0
             next_state=states.index((new_I0, new_M0))
+            next_state_ep[n][j]=next_state
             Val = np.max(Q[next_state])                     # Maximum Q-value of the states accessible from the next state
             Q[state][next_action] = (1-alpha)*Q[state][next_action] + alpha*(reward + gamma*Val)      # Update Q-values
             state=next_state
             j+=1
-    return Q, M0_ep, I0_ep, Rlm_ep, rew_ep, temp_lst, ind_ep
+    return Q, M0_ep, I0_ep, Rlm_ep, rew_ep, temp_lst, ind_ep, M0_app_ep, I0_app_ep, next_state_ep, ode_M0_app_ep
 
 
-N_epiosdes=600
-Q, M0_ep, I0_ep, Rlm_ep, rew_ep, All, ind_ep = q_mat(N_epiosdes)
-#All=np.asarray(All)
-#for i in range(0, cb_ep.shape[0]):
-#    for j in range(0, cb_ep.shape[1]):
-#        sheet1.write(i, j, cb_ep[i][j])
-#        sheet2.write(i, j, act_ep[i][j])
-#        sheet3.write(i, j, ca_ep[i][j])
-#        sheet4.write(i, j, rew_ep[i][j])
-#for i in range(0, All.shape[0]):
-#    sheet5.write(i, 0, All[i][0])
-#    sheet5.write(i, 1, All[i][1])
-#    
-#print(N_epiosdes)
-#plot_G(act_ep, ca_ep, cb_ep, tc_ep, All)
-#book.save("CSTR_RL3_20_20_20_1_point1_3K_reward_1bydelta_or_-50k_U_Qby10_and_inf_epsilol_point1.xls")
-# 
+N_epiosdes=100
+Q, M0_ep, I0_ep, Rlm_ep, rew_ep, All, ind_ep, M0_app_ep, I0_app_ep, next_state_ep, ode_M0_app_ep = q_mat(N_epiosdes)
