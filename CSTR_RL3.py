@@ -30,14 +30,14 @@ up_I0=.01
 low_M=1
 up_M=2000000
 
-T=120
+T=400
 global dt
 dt=1
 S_I0=np.linspace(low_I0, up_I0, 51)
 #S_M0=np.linspace(low_M, up_M, 51)
-S_M0=np.logspace(-1, 5.301029995664,num=400, base=10.0)
+S_M0=np.logspace(4, 7.301029995664,num=400, base=10.0)
 states=list(itertools.product(S_I0,S_M0))
-moves=np.linspace(200,3000,101)
+moves=np.linspace(10,1000000000,101)
 #CA=np.logspace(3.301029995, 3.579783596,num=100, base=10.0)
 #CA=np.logspace(3.30102999,3.5797358, num=101, base=10.0)
 
@@ -74,7 +74,7 @@ B41=2.493E-1
 B42=-4.459E-1
 Rg=8.314
 I0=0.00258
-M0=5000000
+M0=500000
 Rli=0.00000000
 Rlm=1000
 Rvm=0
@@ -161,12 +161,13 @@ def get_state(state, action_a, time, Io):
     ti, temp2=eng.MMA_Simulation(float(init_t+dt), float(init_t), float(n), float(u), float(Io[0]), float(Io[1]), float(Io[2]), float(Io[3]), float(Io[4]), float(Io[5]), float(Io[6]), float(Io[7]), float(Io[8]), float(Io[9]), float(Io[10]), float(Io[11]), float(Io[12]), float(Io[13]), float(Io[14]), float(Io[15]), 1500000.0, 0.0258, nargout=2)
     All = temp2[-1]
     Mw_avg_new=MWm*(All[5]+All[8])/(All[4]+All[7])
-    reward=(Mw_avg_new-Mw_avg_old)*1000000000000
+    reward=(Mw_avg_new-Mw_avg_old)/Mw_avg_old
     if reward<0:
-        reward=-5000000
+        reward=-5000000*reward
+#    elif reward<0.05:
+#        reward=0
     else:
-        reward=np.inf
-
+        reward=reward*10000000
     return All, reward
 
 def find_nearest(array, value):
@@ -296,7 +297,7 @@ Q=np.zeros([len(states), len(moves)])
 def q_mat(N_episodes, gamma=0.99, alpha=0.25):
     init_val=[I0, M0, 0.01, 0.01, 0, 0, 0, 0, 0, M0, M0, V, 0, (kt_0)*exp(A11*(50)+A12), (Kpo_0)*exp(B11*(50)+B12), (kt_0)*exp(A11*(50)+A12)]
     Io=init_val
-    epsilon=0.1
+    epsilon=0.15
     temp_lst=list()
     M0_ep=np.zeros([N_episodes, int(T/dt)+1])
     I0_ep=np.zeros([N_episodes, int(T/dt)+1])
@@ -319,10 +320,12 @@ def q_mat(N_episodes, gamma=0.99, alpha=0.25):
         policy = make_policy(Q, epsilon, len(moves))
         j=0
         t=0
+        Io=init_val
         i0 = find_nearest(S_I0, I0)
         m0 = find_nearest(S_M0, M0)
         state=states.index((i0, m0))
-        print(M0_ep[n-1][int(t/dt)-1])
+        print(M0_ep[n-2][int(t/dt)-2])
+        print(state)
         while t<T:
             action_probs = policy(state)
             next_action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
@@ -335,6 +338,7 @@ def q_mat(N_episodes, gamma=0.99, alpha=0.25):
             t+=dt
             Io=All
             M0_ep[n][j]=MWm*(Io[5]+Io[8])/(Io[4]+Io[7])
+#            print(str(M0_ep[n][j])+", "+str(t))
             temp_lst.append(All)
         
             new_I0=All[0]
